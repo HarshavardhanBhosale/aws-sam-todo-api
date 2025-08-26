@@ -1,0 +1,74 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Serverless TODO API (Python) using AWS SAM + DynamoDB + HTTP API
+
+Globals:
+  Function:
+    Timeout: 10
+    Runtime: python3.11
+    MemorySize: 256
+    Environment:
+      Variables:
+        TABLE_NAME: !Ref TodosTable
+
+Resources:
+  Api:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      CorsConfiguration:
+        AllowHeaders: ['*']
+        AllowMethods: ['*']
+        AllowOrigins: ['*']
+
+  TodosFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/
+      Handler: app.lambda_handler
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref TodosTable
+      Events:
+        GetTodos:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref Api
+            Path: /todos
+            Method: GET
+        GetTodo:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref Api
+            Path: /todos/{id}
+            Method: GET
+        CreateTodo:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref Api
+            Path: /todos
+            Method: POST
+        DeleteTodo:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref Api
+            Path: /todos/{id}
+            Method: DELETE
+
+  TodosTable:
+    Type: AWS::Serverless::SimpleTable
+    Properties:
+      PrimaryKey:
+        Name: id
+        Type: String
+      TableName: !Sub '${AWS::StackName}-todos'
+      ProvisionedThroughput:
+        ReadCapacityUnits: 1
+        WriteCapacityUnits: 1
+
+Outputs:
+  ApiEndpoint:
+    Description: HTTP API base URL
+    Value: !Sub 'https://${Api}.execute-api.${AWS::Region}.amazonaws.com'
+  TableName:
+    Description: DynamoDB table name
+    Value: !Ref TodosTable
